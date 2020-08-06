@@ -7,4 +7,4 @@ Introduction: The image dataset and code used in SIGIR 2020 paper "Preference-ba
    - SERP_level_preference : SERP-level preference judgments (Golden standard used in the paper). The format is "Query	Winner(0: Sogou, 1: Tie, 2: Baidu)"
    - Image_position.json : Position information of each image. For each image, a triple (row_number, column_number, number of images in the row) is given. *In image search, a gird-based result placement is adopted.*
 - **Code**
-   - PWP.py : Code for the proposed preference-based evaluation metric : Preference-Winning-Penalty (PWP). How to read and process the above files are also shown in this code file.
+   - PWP.py : Code for the proposed preference-based evaluation metric : Preference-Winning-Penalty (PWP). How to read and process the above datasets are also shown in this code file.
