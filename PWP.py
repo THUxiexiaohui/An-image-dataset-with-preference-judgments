@@ -4,6 +4,35 @@
 import json
 import scipy.stats as stats
 import math
+import numpy as np
+
+def rbp(r, p, method = 0):
+    ll = 0
+    now_p = 1
+    for i in range(len(r)):
+        ll += r[i] * now_p
+        now_p *= p
+    ll *= (1-p)
+    return ll
+
+def dcg_at_k(r, k, method=0):
+
+    r = np.asfarray(r)[:k]
+    if r.size:
+        if method == 0:
+            return r[0] + np.sum(r[1:] / np.log2(np.arange(2, r.size + 1)))
+        elif method == 1:
+            return np.sum(r / np.log2(np.arange(2, r.size + 2)))
+        else:
+            raise ValueError('method must be 0 or 1.')
+    return 0.
+
+
+def ndcg_at_k(r, k, method=0):
+    dcg_max = dcg_at_k(sorted(r, reverse=True), k, method)
+    if not dcg_max:
+        return 0.
+    return dcg_at_k(r, k, method) / dcg_max
 
 def score_map(score_list):
     #major voting
@@ -142,14 +171,53 @@ def PWP(score_arr, position_arr):
     return [PW_sogou * PB_sogou, PW_baidu * PB_baidu]
 
 
+def read_rel_data():
+    query_image_rel_dic = {}
+    with open("relevance_data", "r") as f_in:
+        line = f_in.readline()
+        while True:
+            line = f_in.readline()
+            if not line:
+                break
+            arr = line.strip().split("\t")
+            query = arr[0]
+            engine = arr[1].split("/")[0]
+            img_id = int(arr[1].split("_")[1].split(".")[0])
+            rel_score = float(arr[2])
+            engine_id = 0 if engine == "sogou" else 1
+            if query not in query_image_rel_dic:
+                query_image_rel_dic[query] = {}
+            if engine_id not in query_image_rel_dic[query]:
+                query_image_rel_dic[query][engine_id] = []
+            query_image_rel_dic[query][engine_id].append([img_id, rel_score])
+    return query_image_rel_dic
+
+
+def relevance_metric(metric_name, score_arr):
+    sorted_score_arr = [sorted(score_arr[0], key=lambda x:x[0]), sorted(score_arr[1], key=lambda x:x[0])]
+    new_arr = [[], []]
+    for i in range(2):
+        for j in range(len(sorted_score_arr[i])):
+            new_arr[i].append(sorted_score_arr[i][j][1])
+
+    if metric_name == "RBP":
+        sogou_score = rbp(new_arr[0], 0.99)
+        baidu_score = rbp(new_arr[1], 0.99)
+    if metric_name == "NDCG":
+        sogou_score = ndcg_at_k(new_arr[0], 10)
+        baidu_score = ndcg_at_k(new_arr[1], 10)
+    return [sogou_score, baidu_score]
+    
 
 if __name__ == "__main__":
     query_image_pref_dict, SERP_level_pref_dic, query_img_position_dic = read_data()
+    query_image_rel_dic = read_rel_data()
     metric_scores = []
     SERP_scores = []
     for query in SERP_level_pref_dic:
         golden_standard = SERP_level_pref_dic[query]
         sogou_score, baidu_score = PWP(query_image_pref_dict[query], query_img_position_dic[query])
+        # sogou_score, baidu_score = relevance_metric("NDCG", query_image_rel_dic[query])
         SERP_scores.append(golden_standard)
         metric_scores.append(1.0 / (1 + math.exp(sogou_score - baidu_score)))
     print(stats.pearsonr(metric_scores, SERP_scores))
